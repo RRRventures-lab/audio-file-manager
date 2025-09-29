@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audio File Manager Pro - Format Converter</title>
+    <title>Audio File Manager Pro - Format Converter & Audio Splitter</title>
     <style>
         * {
             margin: 0;
@@ -70,7 +70,7 @@
             outline: none;
         }
 
-        .batch-convert-btn {
+        .batch-convert-btn, .open-splitter-btn {
             padding: 10px 25px;
             background: linear-gradient(135deg, #FF6B6B, #FF8787);
             color: white;
@@ -81,7 +81,11 @@
             transition: transform 0.3s ease;
         }
 
-        .batch-convert-btn:hover {
+        .open-splitter-btn {
+            background: linear-gradient(135deg, #00C9FF, #92FE9D);
+        }
+
+        .batch-convert-btn:hover, .open-splitter-btn:hover {
             transform: translateY(-2px);
         }
 
@@ -317,6 +321,7 @@
             display: flex;
             gap: 10px;
             align-items: center;
+            flex-direction: column;
         }
 
         .action-btn {
@@ -341,7 +346,7 @@
             fill: #666;
         }
 
-        .download-btn {
+        .download-btn, .split-btn {
             padding: 8px 16px;
             background: linear-gradient(135deg, #4CAF50, #45a049);
             color: white;
@@ -355,11 +360,15 @@
             gap: 5px;
         }
 
-        .download-btn:hover {
+        .split-btn {
+            background: linear-gradient(135deg, #00C9FF, #92FE9D);
+        }
+
+        .download-btn:hover, .split-btn:hover {
             transform: translateY(-2px);
         }
 
-        .download-btn svg {
+        .download-btn svg, .split-btn svg {
             width: 18px;
             height: 18px;
             fill: white;
@@ -501,13 +510,308 @@
             font-size: 0.7rem;
             font-weight: 600;
         }
+
+        /* Audio Splitter Modal Styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .splitter-modal {
+            background: white;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 1200px;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .splitter-header {
+            background: linear-gradient(135deg, #00C9FF, #92FE9D);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .splitter-header h2 {
+            font-size: 1.5rem;
+        }
+
+        .close-modal-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: background 0.3s ease;
+        }
+
+        .close-modal-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .splitter-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .waveform-container {
+            background: #f5f5f5;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .waveform-canvas {
+            width: 100%;
+            height: 200px;
+            background: white;
+            border-radius: 8px;
+            cursor: crosshair;
+            display: block;
+        }
+
+        .waveform-timeline {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .split-marker {
+            position: absolute;
+            width: 2px;
+            height: 200px;
+            background: #ff4444;
+            cursor: ew-resize;
+            top: 20px;
+            z-index: 10;
+        }
+
+        .split-marker::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: -4px;
+            width: 10px;
+            height: 10px;
+            background: #ff4444;
+            border-radius: 50%;
+        }
+
+        .split-marker-label {
+            position: absolute;
+            top: -25px;
+            left: -20px;
+            background: #ff4444;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+        }
+
+        .splitter-controls {
+            background: #f8f9ff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .splitter-controls h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+
+        .control-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .control-btn.primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .control-btn.secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .control-btn.danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .control-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .segments-list {
+            background: #f8f9ff;
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .segments-list h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .segment-item {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .segment-info {
+            flex: 1;
+        }
+
+        .segment-name-input {
+            padding: 5px 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 200px;
+            margin-right: 10px;
+        }
+
+        .segment-time {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .segment-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .threshold-slider {
+            width: 200px;
+        }
+
+        .threshold-value {
+            display: inline-block;
+            width: 50px;
+            text-align: center;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .playback-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-top: 15px;
+        }
+
+        .playback-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.3s ease;
+        }
+
+        .playback-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .playback-time {
+            margin-left: 10px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .zoom-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .zoom-btn {
+            width: 30px;
+            height: 30px;
+            border: 1px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .zoom-btn:hover {
+            background: #667eea;
+            color: white;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>🎵 Audio File Manager Pro</h1>
-            <p>Convert, rename, and organize audio files - All formats supported</p>
+            <p>Convert, rename, split and organize audio files - All formats supported</p>
         </div>
 
         <div class="features-bar">
@@ -539,6 +843,9 @@
             <input type="file" id="fileInput" accept="audio/*,video/*" multiple>
             <p style="margin-top: 20px; font-size: 0.9rem;">
                 Accepts ALL audio formats including MP3, WAV, FLAC, OGG, M4A, AAC, OPUS, WMA, AIF/AIFF, and more
+            </p>
+            <p style="margin-top: 10px; font-size: 0.85rem; color: #764ba2;">
+                <strong>NEW:</strong> Split audio files into multiple segments with smart silence detection!
             </p>
         </div>
 
@@ -595,10 +902,90 @@
         </div>
     </div>
 
+    <!-- Audio Splitter Modal -->
+    <div class="modal-overlay" id="splitterModal">
+        <div class="splitter-modal">
+            <div class="splitter-header">
+                <h2>🎛️ Audio Splitter</h2>
+                <button class="close-modal-btn" onclick="closeSplitter()">✕</button>
+            </div>
+            <div class="splitter-body">
+                <div class="waveform-container">
+                    <canvas class="waveform-canvas" id="waveformCanvas"></canvas>
+                    <div class="waveform-timeline" id="waveformTimeline">
+                        <span>0:00</span>
+                        <span id="durationLabel">0:00</span>
+                    </div>
+                    <div id="splitMarkersContainer"></div>
+                </div>
+
+                <div class="playback-controls">
+                    <button class="playback-btn" onclick="togglePlayback()">
+                        <span id="playPauseIcon">▶</span>
+                    </button>
+                    <span class="playback-time" id="playbackTime">0:00 / 0:00</span>
+                    <div class="zoom-controls">
+                        <button class="zoom-btn" onclick="zoomIn()">+</button>
+                        <button class="zoom-btn" onclick="zoomOut()">-</button>
+                        <button class="zoom-btn" onclick="resetZoom()">⟲</button>
+                    </div>
+                </div>
+
+                <div class="splitter-controls">
+                    <h3>Split Controls</h3>
+                    <div class="control-row">
+                        <button class="control-btn primary" onclick="detectSilence()">
+                            🔍 Smart Detect Silence
+                        </button>
+                        <label>Silence Threshold:</label>
+                        <input type="range" class="threshold-slider" id="silenceThreshold"
+                               min="0" max="100" value="30" oninput="updateThreshold(this.value)">
+                        <span class="threshold-value" id="thresholdValue">30%</span>
+                    </div>
+                    <div class="control-row">
+                        <button class="control-btn secondary" onclick="addManualSplit()">
+                            ➕ Add Split at Cursor
+                        </button>
+                        <button class="control-btn danger" onclick="clearAllSplits()">
+                            🗑️ Clear All Splits
+                        </button>
+                        <button class="control-btn secondary" onclick="previewSegment()">
+                            🔊 Preview Current Segment
+                        </button>
+                    </div>
+                </div>
+
+                <div class="segments-list">
+                    <h3>Audio Segments</h3>
+                    <div id="segmentsList"></div>
+                    <div class="control-row" style="margin-top: 20px;">
+                        <button class="control-btn primary" onclick="exportAllSegments()">
+                            💾 Export All Segments
+                        </button>
+                        <select class="format-select" id="segmentFormat">
+                            <option value="wav">WAV</option>
+                            <option value="mp3">MP3</option>
+                            <option value="ogg">OGG</option>
+                            <option value="aif">AIF</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.0/lame.min.js"></script>
     <script>
         let audioFiles = [];
         let audioContext = null;
+        let currentSplitterFile = null;
+        let splitMarkers = [];
+        let waveformData = null;
+        let playbackSource = null;
+        let isPlaying = false;
+        let zoomLevel = 1;
+        let cursorPosition = 0;
+        let currentAudioBuffer = null;
 
         // Initialize audio context
         function getAudioContext() {
@@ -763,6 +1150,12 @@
                         </div>
                     </div>
                     <div class="file-actions">
+                        <button class="split-btn" onclick="openSplitter(${fileObj.id})" title="Split Audio">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M8,3A2,2 0 0,0 6,5V9A2,2 0 0,1 4,11H3V13H4A2,2 0 0,1 6,15V19A2,2 0 0,0 8,21H10V19H8V14A2,2 0 0,0 7,12A2,2 0 0,0 8,10V5H10V3M16,3A2,2 0 0,1 18,5V9A2,2 0 0,0 20,11H21V13H20A2,2 0 0,0 18,15V19A2,2 0 0,1 16,21H14V19H16V14A2,2 0 0,1 17,12A2,2 0 0,1 16,10V5H14V3H16Z"/>
+                            </svg>
+                            Split
+                        </button>
                         <button class="action-btn" onclick="editFileName(${fileObj.id})" title="Rename">
                             <svg viewBox="0 0 24 24">
                                 <path d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"/>
@@ -1206,6 +1599,407 @@
             updateFilesList();
 
             alert(`All files will be converted to ${format.toUpperCase()} when downloaded`);
+        }
+
+        // Audio Splitter Functions
+        async function openSplitter(fileId) {
+            const fileObj = audioFiles.find(f => f.id === fileId);
+            if (!fileObj) return;
+
+            currentSplitterFile = fileObj;
+            splitMarkers = [];
+
+            // Load and decode audio
+            const ctx = getAudioContext();
+            const arrayBuffer = await fileObj.file.arrayBuffer();
+            currentAudioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+
+            // Generate waveform
+            await generateWaveform(currentAudioBuffer);
+
+            // Update UI
+            updateDuration();
+            updateSegmentsList();
+
+            // Show modal
+            document.getElementById('splitterModal').classList.add('active');
+        }
+
+        function closeSplitter() {
+            stopPlayback();
+            currentSplitterFile = null;
+            currentAudioBuffer = null;
+            splitMarkers = [];
+            document.getElementById('splitterModal').classList.remove('active');
+        }
+
+        async function generateWaveform(audioBuffer) {
+            const canvas = document.getElementById('waveformCanvas');
+            const ctx = canvas.getContext('2d');
+
+            // Set canvas size
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+
+            // Get audio data
+            const channelData = audioBuffer.getChannelData(0);
+            const samples = channelData.length;
+            const samplesPerPixel = Math.floor(samples / canvas.width / zoomLevel);
+
+            // Store waveform data for silence detection
+            waveformData = [];
+
+            // Clear canvas
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw waveform
+            ctx.strokeStyle = '#667eea';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+
+            for (let x = 0; x < canvas.width; x++) {
+                let min = 1.0;
+                let max = -1.0;
+
+                for (let i = 0; i < samplesPerPixel; i++) {
+                    const index = x * samplesPerPixel + i;
+                    if (index < samples) {
+                        const sample = channelData[index];
+                        if (sample < min) min = sample;
+                        if (sample > max) max = sample;
+                    }
+                }
+
+                waveformData.push({ min, max, avg: (min + max) / 2 });
+
+                const yMin = ((min + 1) / 2) * canvas.height;
+                const yMax = ((max + 1) / 2) * canvas.height;
+
+                if (x === 0) {
+                    ctx.moveTo(x, yMin);
+                } else {
+                    ctx.lineTo(x, yMin);
+                }
+                ctx.lineTo(x, yMax);
+            }
+
+            ctx.stroke();
+
+            // Add click handler for manual splits
+            canvas.onclick = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const time = (x / canvas.width) * audioBuffer.duration;
+                addSplitMarker(time);
+            };
+        }
+
+        function detectSilence() {
+            if (!waveformData || !currentAudioBuffer) return;
+
+            const threshold = parseInt(document.getElementById('silenceThreshold').value) / 100;
+            const minSilenceDuration = 0.5; // Minimum silence duration in seconds
+            const canvas = document.getElementById('waveformCanvas');
+            const samplesPerSecond = canvas.width / currentAudioBuffer.duration;
+            const minSilenceSamples = minSilenceDuration * samplesPerSecond;
+
+            splitMarkers = [];
+            let silenceStart = null;
+            let silenceCount = 0;
+
+            for (let i = 0; i < waveformData.length; i++) {
+                const amplitude = Math.abs(waveformData[i].max - waveformData[i].min);
+
+                if (amplitude < threshold * 0.1) { // Silence detected
+                    if (silenceStart === null) {
+                        silenceStart = i;
+                    }
+                    silenceCount++;
+                } else { // Sound detected
+                    if (silenceCount > minSilenceSamples && silenceStart !== null) {
+                        // Add split at the middle of silence period
+                        const splitPoint = (silenceStart + i / 2) / canvas.width * currentAudioBuffer.duration;
+                        addSplitMarker(splitPoint);
+                    }
+                    silenceStart = null;
+                    silenceCount = 0;
+                }
+            }
+
+            updateSegmentsList();
+        }
+
+        function addManualSplit() {
+            // Add split at current playback position or middle if not playing
+            const time = cursorPosition || currentAudioBuffer.duration / 2;
+            addSplitMarker(time);
+        }
+
+        function addSplitMarker(time) {
+            if (!splitMarkers.find(m => Math.abs(m - time) < 0.1)) {
+                splitMarkers.push(time);
+                splitMarkers.sort((a, b) => a - b);
+                renderSplitMarkers();
+                updateSegmentsList();
+            }
+        }
+
+        function renderSplitMarkers() {
+            const container = document.getElementById('splitMarkersContainer');
+            const canvas = document.getElementById('waveformCanvas');
+
+            container.innerHTML = splitMarkers.map((time, index) => {
+                const x = (time / currentAudioBuffer.duration) * canvas.width;
+                return `
+                    <div class="split-marker" style="left: ${x + 20}px;"
+                         onmousedown="startDragMarker(${index}, event)">
+                        <div class="split-marker-label">${formatTime(time)}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function startDragMarker(index, e) {
+            const canvas = document.getElementById('waveformCanvas');
+            const container = document.getElementById('splitMarkersContainer');
+
+            const onMouseMove = (e) => {
+                const rect = container.getBoundingClientRect();
+                const x = Math.max(0, Math.min(canvas.width, e.clientX - rect.left - 20));
+                const time = (x / canvas.width) * currentAudioBuffer.duration;
+                splitMarkers[index] = time;
+                splitMarkers.sort((a, b) => a - b);
+                renderSplitMarkers();
+                updateSegmentsList();
+            };
+
+            const onMouseUp = () => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            };
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+
+        function clearAllSplits() {
+            splitMarkers = [];
+            renderSplitMarkers();
+            updateSegmentsList();
+        }
+
+        function updateSegmentsList() {
+            const container = document.getElementById('segmentsList');
+            const segments = getSegments();
+
+            container.innerHTML = segments.map((segment, index) => `
+                <div class="segment-item">
+                    <div class="segment-info">
+                        <input type="text" class="segment-name-input"
+                               id="segment-name-${index}"
+                               value="${segment.name}"
+                               placeholder="Segment ${index + 1}">
+                        <span class="segment-time">
+                            ${formatTime(segment.start)} - ${formatTime(segment.end)}
+                            (${formatTime(segment.end - segment.start)})
+                        </span>
+                    </div>
+                    <div class="segment-actions">
+                        <button class="control-btn secondary" onclick="previewSegmentRange(${segment.start}, ${segment.end})">
+                            Preview
+                        </button>
+                        <button class="control-btn primary" onclick="exportSegment(${index})">
+                            Export
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getSegments() {
+            const segments = [];
+            let lastTime = 0;
+
+            for (let i = 0; i <= splitMarkers.length; i++) {
+                const endTime = i < splitMarkers.length ? splitMarkers[i] : currentAudioBuffer.duration;
+                const baseName = currentSplitterFile.newName.replace(/\.[^/.]+$/, '');
+
+                segments.push({
+                    name: `${baseName}_part${i + 1}`,
+                    start: lastTime,
+                    end: endTime
+                });
+
+                lastTime = endTime;
+            }
+
+            return segments;
+        }
+
+        async function exportSegment(index) {
+            const segments = getSegments();
+            const segment = segments[index];
+            const nameInput = document.getElementById(`segment-name-${index}`);
+            const segmentName = nameInput.value || segment.name;
+            const format = document.getElementById('segmentFormat').value;
+
+            const segmentBuffer = extractSegment(currentAudioBuffer, segment.start, segment.end);
+
+            let blob;
+            switch(format) {
+                case 'wav':
+                    blob = await convertToWav(segmentBuffer, 'high');
+                    break;
+                case 'mp3':
+                    blob = await convertToMp3(segmentBuffer, 'high');
+                    break;
+                case 'ogg':
+                    blob = await convertToOggOrWebM(segmentBuffer, 'ogg', 'high');
+                    break;
+                case 'aif':
+                    blob = await convertToAiff(segmentBuffer, 'high');
+                    break;
+            }
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${segmentName}.${format}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        async function exportAllSegments() {
+            const segments = getSegments();
+            const format = document.getElementById('segmentFormat').value;
+
+            for (let i = 0; i < segments.length; i++) {
+                await new Promise(resolve => setTimeout(resolve, 200));
+                await exportSegment(i);
+            }
+        }
+
+        function extractSegment(audioBuffer, startTime, endTime) {
+            const ctx = getAudioContext();
+            const startSample = Math.floor(startTime * audioBuffer.sampleRate);
+            const endSample = Math.floor(endTime * audioBuffer.sampleRate);
+            const segmentLength = endSample - startSample;
+
+            const segmentBuffer = ctx.createBuffer(
+                audioBuffer.numberOfChannels,
+                segmentLength,
+                audioBuffer.sampleRate
+            );
+
+            for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+                const originalData = audioBuffer.getChannelData(channel);
+                const segmentData = segmentBuffer.getChannelData(channel);
+
+                for (let i = 0; i < segmentLength; i++) {
+                    segmentData[i] = originalData[startSample + i];
+                }
+            }
+
+            return segmentBuffer;
+        }
+
+        function togglePlayback() {
+            if (isPlaying) {
+                stopPlayback();
+            } else {
+                startPlayback();
+            }
+        }
+
+        function startPlayback() {
+            if (!currentAudioBuffer) return;
+
+            const ctx = getAudioContext();
+            playbackSource = ctx.createBufferSource();
+            playbackSource.buffer = currentAudioBuffer;
+            playbackSource.connect(ctx.destination);
+            playbackSource.start();
+
+            isPlaying = true;
+            document.getElementById('playPauseIcon').textContent = '⏸';
+
+            playbackSource.onended = () => {
+                stopPlayback();
+            };
+        }
+
+        function stopPlayback() {
+            if (playbackSource) {
+                playbackSource.stop();
+                playbackSource = null;
+            }
+            isPlaying = false;
+            document.getElementById('playPauseIcon').textContent = '▶';
+        }
+
+        function previewSegmentRange(start, end) {
+            stopPlayback();
+
+            const ctx = getAudioContext();
+            const segmentBuffer = extractSegment(currentAudioBuffer, start, end);
+
+            playbackSource = ctx.createBufferSource();
+            playbackSource.buffer = segmentBuffer;
+            playbackSource.connect(ctx.destination);
+            playbackSource.start();
+
+            isPlaying = true;
+            document.getElementById('playPauseIcon').textContent = '⏸';
+
+            playbackSource.onended = () => {
+                stopPlayback();
+            };
+        }
+
+        function updateDuration() {
+            if (!currentAudioBuffer) return;
+            document.getElementById('durationLabel').textContent = formatTime(currentAudioBuffer.duration);
+        }
+
+        function updateThreshold(value) {
+            document.getElementById('thresholdValue').textContent = value + '%';
+        }
+
+        function zoomIn() {
+            zoomLevel = Math.min(zoomLevel * 1.5, 10);
+            if (currentAudioBuffer) generateWaveform(currentAudioBuffer);
+        }
+
+        function zoomOut() {
+            zoomLevel = Math.max(zoomLevel / 1.5, 1);
+            if (currentAudioBuffer) generateWaveform(currentAudioBuffer);
+        }
+
+        function resetZoom() {
+            zoomLevel = 1;
+            if (currentAudioBuffer) generateWaveform(currentAudioBuffer);
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function previewSegment() {
+            // Preview the segment at cursor position
+            const segments = getSegments();
+            const time = cursorPosition || 0;
+
+            for (let segment of segments) {
+                if (time >= segment.start && time <= segment.end) {
+                    previewSegmentRange(segment.start, segment.end);
+                    break;
+                }
+            }
         }
     </script>
 </body>
