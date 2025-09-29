@@ -1626,7 +1626,7 @@
             }
 
             const segmentsHtml = fileObj.splitSegments.map(segment => `
-                <div class="split-segment" data-segment-id="${segment.id}">
+                <div class="split-segment" data-segment-id="${segment.id}" id="segment-${fileObj.id}-${segment.id}">
                     <div class="split-segment-info">
                         <input type="text" class="split-segment-input"
                                id="segment-name-${fileObj.id}-${segment.id}"
@@ -1638,7 +1638,7 @@
                         </div>
                     </div>
                     <div class="split-segment-actions">
-                        <button class="action-btn" onclick="playSegment(${fileObj.id}, ${segment.id})" title="Play">
+                        <button class="action-btn play-btn" id="play-btn-${fileObj.id}-${segment.id}" onclick="playSegment(${fileObj.id}, ${segment.id})" title="Play">
                             <svg viewBox="0 0 24 24">
                                 <path d="M8,5.14V19.14L19,12.14L8,5.14Z"/>
                             </svg>
@@ -1683,12 +1683,39 @@
             segment.name = newName;
         }
 
+        // Track currently playing source for stop functionality
+        let currentPlayingSource = null;
+        let currentPlayingSegment = null;
+
         async function playSegment(fileId, segmentId) {
             const fileObj = audioFiles.find(f => f.id === fileId);
             const segment = fileObj.splitSegments.find(s => s.id === segmentId);
 
             try {
+                // Clear previous playing indicator
+                if (currentPlayingSegment) {
+                    const prevSegment = document.getElementById(`segment-${currentPlayingSegment.fileId}-${currentPlayingSegment.segmentId}`);
+                    const prevBtn = document.getElementById(`play-btn-${currentPlayingSegment.fileId}-${currentPlayingSegment.segmentId}`);
+                    if (prevSegment) prevSegment.style.background = '';
+                    if (prevBtn) prevBtn.style.background = '';
+                }
+
+                // Stop any currently playing segment
+                if (currentPlayingSource) {
+                    try {
+                        currentPlayingSource.stop();
+                    } catch (e) {
+                        // Already stopped, ignore
+                    }
+                    currentPlayingSource = null;
+                }
+
                 const ctx = getAudioContext();
+
+                // Resume AudioContext if suspended (required for browsers)
+                if (ctx.state === 'suspended') {
+                    await ctx.resume();
+                }
 
                 // Use cached buffer if available
                 let audioBuffer = fileObj.cachedAudioBuffer;
@@ -1700,16 +1727,43 @@
                     fileObj.cacheTimestamp = Date.now();
                 }
 
+                // Highlight playing segment
+                const segmentDiv = document.getElementById(`segment-${fileId}-${segmentId}`);
+                const playBtn = document.getElementById(`play-btn-${fileId}-${segmentId}`);
+                if (segmentDiv) segmentDiv.style.background = '#e8f5e9';
+                if (playBtn) playBtn.style.background = '#4CAF50';
+
+                currentPlayingSegment = { fileId, segmentId };
+
+                // Create buffer source
                 const source = ctx.createBufferSource();
                 source.buffer = audioBuffer;
                 source.connect(ctx.destination);
 
+                // Track this source
+                currentPlayingSource = source;
+
+                // Clear reference and highlight when playback ends
+                source.onended = () => {
+                    if (currentPlayingSource === source) {
+                        currentPlayingSource = null;
+                        if (segmentDiv) segmentDiv.style.background = '';
+                        if (playBtn) playBtn.style.background = '';
+                        currentPlayingSegment = null;
+                    }
+                };
+
                 // Play only the segment
+                // Parameters: start(when, offset, duration)
                 source.start(0, segment.start, segment.duration);
+
+                console.log(`Playing segment ${segment.id}: ${segment.start}s - ${segment.end}s (${segment.duration}s)`);
 
             } catch (error) {
                 console.error('Error playing segment:', error);
                 alert(`Error playing segment: ${error.message}`);
+                currentPlayingSource = null;
+                currentPlayingSegment = null;
             }
         }
 
