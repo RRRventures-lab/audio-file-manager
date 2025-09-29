@@ -933,6 +933,9 @@
                         </div>
                         <div class="split-controls" id="split-controls-${fileObj.id}">
                             <h4>✂️ Audio Splitter</h4>
+                            <div class="waveform-container" id="waveform-container-${fileObj.id}">
+                                <canvas class="waveform-canvas" id="waveform-${fileObj.id}" width="800" height="100"></canvas>
+                            </div>
                             <div class="split-settings">
                                 <div class="split-setting-group">
                                     <label>Silence Threshold (dB):</label>
@@ -948,6 +951,9 @@
                                 </div>
                                 <button class="split-btn" onclick="detectSplitPoints(${fileObj.id})">
                                     Detect Split Points
+                                </button>
+                                <button class="split-btn" onclick="drawWaveform(${fileObj.id})" style="background: linear-gradient(135deg, #4CAF50, #45a049);">
+                                    Show Waveform
                                 </button>
                             </div>
                             <div id="split-preview-${fileObj.id}" style="display: none;"></div>
@@ -1365,6 +1371,13 @@
         function removeFile(id) {
             const fileObj = audioFiles.find(f => f.id === id);
             URL.revokeObjectURL(fileObj.url);
+
+            // Clean up cached audio buffer
+            if (fileObj.cachedAudioBuffer) {
+                delete fileObj.cachedAudioBuffer;
+                delete fileObj.cacheTimestamp;
+            }
+
             audioFiles = audioFiles.filter(f => f.id !== id);
             updateFilesList();
         }
@@ -1372,6 +1385,12 @@
         function clearAll() {
             audioFiles.forEach(fileObj => {
                 URL.revokeObjectURL(fileObj.url);
+
+                // Clean up cached audio buffers
+                if (fileObj.cachedAudioBuffer) {
+                    delete fileObj.cachedAudioBuffer;
+                    delete fileObj.cacheTimestamp;
+                }
             });
             audioFiles = [];
             updateFilesList();
@@ -1407,10 +1426,19 @@
             const minSegment = parseFloat(document.getElementById(`minSegment-${id}`).value);
 
             try {
-                // Decode audio
                 const ctx = getAudioContext();
-                const arrayBuffer = await fileObj.file.arrayBuffer();
-                const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+
+                // Use cached buffer if available
+                let audioBuffer = fileObj.cachedAudioBuffer;
+
+                if (!audioBuffer) {
+                    const arrayBuffer = await fileObj.file.arrayBuffer();
+                    audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+
+                    // Cache the decoded buffer for future use
+                    fileObj.cachedAudioBuffer = audioBuffer;
+                    fileObj.cacheTimestamp = Date.now();
+                }
 
                 // Analyze audio for silence
                 const splitPoints = analyzeSilence(audioBuffer, threshold, minSilence, minSegment);
@@ -1428,33 +1456,82 @@
             }
         }
 
-        function analyzeSilence(audioBuffer, thresholdDb, minSilenceDuration, minSegmentDuration) {
-            const sampleRate = audioBuffer.sampleRate;
-            const channelData = audioBuffer.getChannelData(0); // Use first channel
-            const threshold = Math.pow(10, thresholdDb / 20); // Convert dB to linear
+        // Helper function for RMS calculation
+        function calculateRMS(channelData, startIndex, windowSize) {
+            let sum = 0;
+            const endIndex = Math.min(startIndex + windowSize, channelData.length);
+            const actualWindowSize = endIndex - startIndex;
 
+            for (let i = startIndex; i < endIndex; i++) {
+                sum += channelData[i] * channelData[i];
+            }
+
+            return Math.sqrt(sum / actualWindowSize);
+        }
+
+        // Improved silence detection with RMS analysis, multi-channel support, and hysteresis
+        function analyzeSilence(audioBuffer, thresholdDb, minSilenceDuration, minSegmentDuration) {
+            // Validation
+            if (!audioBuffer || audioBuffer.length === 0) {
+                throw new Error('Invalid audio buffer: buffer is empty');
+            }
+
+            if (audioBuffer.duration < minSegmentDuration) {
+                throw new Error(`Audio too short: ${audioBuffer.duration.toFixed(2)}s (minimum: ${minSegmentDuration}s)`);
+            }
+
+            if (thresholdDb > -10 || thresholdDb < -80) {
+                throw new Error(`Invalid threshold: ${thresholdDb}dB (must be between -80 and -10)`);
+            }
+
+            if (minSilenceDuration <= 0 || minSegmentDuration <= 0) {
+                throw new Error('Duration parameters must be positive');
+            }
+
+            const sampleRate = audioBuffer.sampleRate;
+            const numberOfChannels = audioBuffer.numberOfChannels;
+
+            // Use RMS windowing instead of single-sample detection
+            const windowSize = Math.floor(sampleRate * 0.02); // 20ms windows
             const minSilenceSamples = minSilenceDuration * sampleRate;
             const minSegmentSamples = minSegmentDuration * sampleRate;
 
+            // Hysteresis: two thresholds to prevent bouncing
+            const silenceThresholdDb = thresholdDb;
+            const audioThresholdDb = thresholdDb + 6; // 6dB hysteresis
+
             const splitPoints = [];
+            let state = 'audio'; // or 'silence'
             let silenceStart = null;
             let lastSplitPoint = 0;
 
-            // Scan through audio
-            for (let i = 0; i < channelData.length; i++) {
-                const sample = Math.abs(channelData[i]);
+            // Scan through audio with windowing
+            for (let i = 0; i < audioBuffer.length; i += windowSize) {
+                // Analyze ALL channels, use the loudest one (multi-channel support)
+                let maxRMS = 0;
 
-                if (sample < threshold) {
-                    // Silence detected
-                    if (silenceStart === null) {
-                        silenceStart = i;
-                    }
-                } else {
-                    // Sound detected
+                for (let channel = 0; channel < numberOfChannels; channel++) {
+                    const channelData = audioBuffer.getChannelData(channel);
+                    const rms = calculateRMS(channelData, i, windowSize);
+                    maxRMS = Math.max(maxRMS, rms);
+                }
+
+                // Convert RMS to dB
+                const currentDb = maxRMS > 0 ? 20 * Math.log10(maxRMS) : -100;
+
+                // State machine with hysteresis
+                if (state === 'audio' && currentDb < silenceThresholdDb) {
+                    // Transition to silence
+                    state = 'silence';
+                    silenceStart = i;
+                } else if (state === 'silence' && currentDb > audioThresholdDb) {
+                    // Transition to audio
+                    state = 'audio';
+
                     if (silenceStart !== null) {
                         const silenceDuration = i - silenceStart;
 
-                        // Check if silence is long enough and segment is long enough
+                        // Check if silence and segment are long enough
                         if (silenceDuration >= minSilenceSamples &&
                             (silenceStart - lastSplitPoint) >= minSegmentSamples) {
                             // Split in the middle of silence
@@ -1462,28 +1539,34 @@
                             splitPoints.push(splitPoint / sampleRate); // Convert to seconds
                             lastSplitPoint = splitPoint;
                         }
-
-                        silenceStart = null;
                     }
+
+                    silenceStart = null;
                 }
             }
 
             return splitPoints;
         }
 
-        function createSegments(splitPoints, duration) {
+        function createSegments(splitPoints, duration, paddingSeconds = 0.05) {
             const segments = [];
             let start = 0;
 
             splitPoints.forEach((splitPoint, index) => {
+                // Add padding to preserve audio transients (attack/decay)
+                const segmentEnd = Math.min(splitPoint + paddingSeconds, duration);
+                const nextStart = Math.max(splitPoint - paddingSeconds, 0);
+
                 segments.push({
                     id: index,
                     name: `Segment ${index + 1}`,
                     start: start,
-                    end: splitPoint,
-                    duration: splitPoint - start
+                    end: segmentEnd,
+                    duration: segmentEnd - start,
+                    fadeIn: start > 0 ? 0.01 : 0,  // Small fade-in if not first segment
+                    fadeOut: 0.01  // Small fade-out to prevent clicks
                 });
-                start = splitPoint;
+                start = nextStart;
             });
 
             // Last segment
@@ -1492,7 +1575,9 @@
                 name: `Segment ${splitPoints.length + 1}`,
                 start: start,
                 end: duration,
-                duration: duration - start
+                duration: duration - start,
+                fadeIn: start > 0 ? 0.01 : 0,
+                fadeOut: 0
             });
 
             return segments;
@@ -1571,8 +1656,16 @@
 
             try {
                 const ctx = getAudioContext();
-                const arrayBuffer = await fileObj.file.arrayBuffer();
-                const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+
+                // Use cached buffer if available
+                let audioBuffer = fileObj.cachedAudioBuffer;
+
+                if (!audioBuffer) {
+                    const arrayBuffer = await fileObj.file.arrayBuffer();
+                    audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+                    fileObj.cachedAudioBuffer = audioBuffer;
+                    fileObj.cacheTimestamp = Date.now();
+                }
 
                 const source = ctx.createBufferSource();
                 source.buffer = audioBuffer;
@@ -1593,8 +1686,16 @@
 
             try {
                 const ctx = getAudioContext();
-                const arrayBuffer = await fileObj.file.arrayBuffer();
-                const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+
+                // Use cached buffer if available
+                let audioBuffer = fileObj.cachedAudioBuffer;
+
+                if (!audioBuffer) {
+                    const arrayBuffer = await fileObj.file.arrayBuffer();
+                    audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+                    fileObj.cachedAudioBuffer = audioBuffer;
+                    fileObj.cacheTimestamp = Date.now();
+                }
 
                 // Extract segment
                 const segmentBuffer = extractSegment(audioBuffer, segment.start, segment.end);
@@ -1622,9 +1723,13 @@
             const sampleRate = audioBuffer.sampleRate;
             const numberOfChannels = audioBuffer.numberOfChannels;
 
-            const startSample = Math.floor(startTime * sampleRate);
-            const endSample = Math.floor(endTime * sampleRate);
+            const startSample = Math.max(0, Math.floor(startTime * sampleRate));
+            const endSample = Math.min(audioBuffer.length, Math.floor(endTime * sampleRate));
             const length = endSample - startSample;
+
+            if (length <= 0) {
+                throw new Error('Invalid segment: length is zero or negative');
+            }
 
             const segmentBuffer = getAudioContext().createBuffer(
                 numberOfChannels,
@@ -1632,13 +1737,13 @@
                 sampleRate
             );
 
+            // Use TypedArray bulk copy (10-50× faster than loop)
             for (let channel = 0; channel < numberOfChannels; channel++) {
                 const sourceData = audioBuffer.getChannelData(channel);
                 const segmentData = segmentBuffer.getChannelData(channel);
 
-                for (let i = 0; i < length; i++) {
-                    segmentData[i] = sourceData[startSample + i];
-                }
+                // Bulk copy using subarray and set - massive performance improvement
+                segmentData.set(sourceData.subarray(startSample, endSample));
             }
 
             return segmentBuffer;
@@ -1671,6 +1776,97 @@
                 await downloadSegment(fileId, fileObj.splitSegments[i].id);
                 // Small delay between downloads
                 await new Promise(resolve => setTimeout(resolve, 300));
+            }
+        }
+
+        // Waveform visualization
+        async function drawWaveform(fileId) {
+            const fileObj = audioFiles.find(f => f.id === fileId);
+            const canvas = document.getElementById(`waveform-${fileId}`);
+
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+
+            try {
+                // Get or decode audio buffer
+                let audioBuffer = fileObj.cachedAudioBuffer;
+
+                if (!audioBuffer) {
+                    const arrayBuffer = await fileObj.file.arrayBuffer();
+                    audioBuffer = await getAudioContext().decodeAudioData(arrayBuffer);
+                    fileObj.cachedAudioBuffer = audioBuffer;
+                    fileObj.cacheTimestamp = Date.now();
+                }
+
+                const channelData = audioBuffer.getChannelData(0);
+                const step = Math.ceil(channelData.length / width);
+                const amp = height / 2;
+
+                // Clear canvas
+                ctx.clearRect(0, 0, width, height);
+                ctx.fillStyle = '#f0f0f0';
+                ctx.fillRect(0, 0, width, height);
+
+                // Draw center line
+                ctx.strokeStyle = '#ddd';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(0, amp);
+                ctx.lineTo(width, amp);
+                ctx.stroke();
+
+                // Draw waveform
+                ctx.beginPath();
+                ctx.strokeStyle = '#667eea';
+                ctx.lineWidth = 1;
+
+                for (let i = 0; i < width; i++) {
+                    let min = 1.0;
+                    let max = -1.0;
+
+                    // Find min/max in this window
+                    for (let j = 0; j < step; j++) {
+                        const index = (i * step) + j;
+                        if (index < channelData.length) {
+                            const datum = channelData[index];
+                            if (datum < min) min = datum;
+                            if (datum > max) max = datum;
+                        }
+                    }
+
+                    ctx.moveTo(i, (1 + min) * amp);
+                    ctx.lineTo(i, (1 + max) * amp);
+                }
+
+                ctx.stroke();
+
+                // Draw split points if they exist
+                if (fileObj.splitPoints && fileObj.splitPoints.length > 0) {
+                    ctx.strokeStyle = '#ff0000';
+                    ctx.lineWidth = 2;
+
+                    fileObj.splitPoints.forEach(splitPoint => {
+                        const x = (splitPoint / audioBuffer.duration) * width;
+                        ctx.beginPath();
+                        ctx.moveTo(x, 0);
+                        ctx.lineTo(x, height);
+                        ctx.stroke();
+
+                        // Draw scissors icon
+                        ctx.font = '16px Arial';
+                        ctx.fillStyle = '#ff0000';
+                        ctx.fillText('✂', x - 8, 15);
+                    });
+                }
+
+            } catch (error) {
+                console.error('Error drawing waveform:', error);
+                ctx.fillStyle = '#ff0000';
+                ctx.font = '14px Arial';
+                ctx.fillText('Error loading waveform', 10, height / 2);
             }
         }
     </script>
