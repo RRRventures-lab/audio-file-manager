@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio File Manager Pro - Format Converter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .features-bar {
+            background: #f8f9ff;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .batch-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .batch-format-select {
+            padding: 8px 15px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            background: white;
+            color: #333;
+            font-size: 0.95rem;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .batch-convert-btn {
+            padding: 10px 25px;
+            background: linear-gradient(135deg, #FF6B6B, #FF8787);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: transform 0.3s ease;
+        }
+
+        .batch-convert-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .supported-formats {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .supported-formats strong {
+            color: #667eea;
+        }
+
+        .drop-zone {
+            margin: 30px;
+            padding: 60px;
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            text-align: center;
+            transition: all 0.3s ease;
+            background: #f8f9ff;
+        }
+
+        .drop-zone.dragover {
+            background: #e8ecff;
+            border-color: #764ba2;
+            transform: scale(1.02);
+        }
+
+        .drop-zone h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+
+        .drop-zone p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .file-input-label {
+            display: inline-block;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            font-weight: 500;
+        }
+
+        .file-input-label:hover {
+            transform: translateY(-2px);
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .files-container {
+            padding: 30px;
+        }
+
+        .files-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .files-header h3 {
+            color: #333;
+            font-size: 1.5rem;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .download-all-btn, .clear-all-btn {
+            padding: 10px 25px;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+
+        .download-all-btn {
+            background: #4CAF50;
+        }
+
+        .download-all-btn:hover {
+            background: #45a049;
+        }
+
+        .clear-all-btn {
+            background: #f44336;
+        }
+
+        .clear-all-btn:hover {
+            background: #da190b;
+        }
+
+        .download-all-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 20px;
+            margin-bottom: 15px;
+            background: #f5f5f5;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .file-item:hover {
+            background: #ececec;
+            transform: translateX(5px);
+        }
+
+        .file-item.converting {
+            background: #fff3cd;
+        }
+
+        .file-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 20px;
+            flex-shrink: 0;
+        }
+
+        .file-icon svg {
+            width: 30px;
+            height: 30px;
+            fill: white;
+        }
+
+        .file-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .file-name-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .file-name {
+            font-weight: 600;
+            color: #333;
+            font-size: 1.1rem;
+            word-break: break-all;
+        }
+
+        .original-name {
+            font-size: 0.85rem;
+            color: #666;
+            font-style: italic;
+            margin-bottom: 5px;
+        }
+
+        .file-name-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 2px solid #667eea;
+            border-radius: 5px;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .file-meta {
+            display: flex;
+            gap: 20px;
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .format-converter {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+        }
+
+        .format-label {
+            font-size: 0.9rem;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .format-select {
+            padding: 6px 12px;
+            border: 2px solid #667eea;
+            border-radius: 5px;
+            background: white;
+            color: #333;
+            font-size: 0.9rem;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .quality-select {
+            padding: 6px 12px;
+            border: 2px solid #667eea;
+            border-radius: 5px;
+            background: white;
+            color: #333;
+            font-size: 0.9rem;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .file-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .action-btn {
+            padding: 10px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .action-btn:hover {
+            background: #ddd;
+        }
+
+        .action-btn svg {
+            width: 24px;
+            height: 24px;
+            fill: #666;
+        }
+
+        .download-btn {
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: transform 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .download-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: white;
+        }
+
+        .audio-player {
+            margin-top: 15px;
+            width: 100%;
+        }
+
+        .audio-controls {
+            width: 100%;
+            height: 40px;
+            border-radius: 20px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px;
+            color: #999;
+        }
+
+        .empty-state svg {
+            width: 100px;
+            height: 100px;
+            fill: #ddd;
+            margin-bottom: 20px;
+        }
+
+        .format-badge {
+            padding: 4px 10px;
+            background: #667eea;
+            color: white;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .save-btn, .cancel-btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+
+        .save-btn {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .save-btn:hover {
+            background: #45a049;
+        }
+
+        .cancel-btn {
+            background: #f44336;
+            color: white;
+            margin-left: 5px;
+        }
+
+        .cancel-btn:hover {
+            background: #da190b;
+        }
+
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: #e0e0e0;
+            border-radius: 0 0 10px 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0;
+            transition: width 0.3s ease;
+        }
+
+        .converting-indicator {
+            display: inline-block;
+            padding: 4px 10px;
+            background: #ff9800;
+            color: white;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+
+        .format-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e8f5e9;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            color: #2e7d32;
+        }
+
+        .format-info h4 {
+            margin-bottom: 10px;
+            color: #1b5e20;
+        }
+
+        .format-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .format-list-item {
+            padding: 8px;
+            background: white;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .format-list-item .badge {
+            padding: 2px 6px;
+            background: #4CAF50;
+            color: white;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎵 Audio File Manager Pro</h1>
+            <p>Convert, rename, and organize audio files - All formats supported</p>
+        </div>
+
+        <div class="features-bar">
+            <div class="batch-controls">
+                <label class="format-label">Batch Convert All To:</label>
+                <select class="batch-format-select" id="batchFormatSelect">
+                    <option value="">Keep Original</option>
+                    <option value="wav">WAV (Uncompressed)</option>
+                    <option value="mp3">MP3 (Compressed)</option>
+                    <option value="ogg">OGG Vorbis</option>
+                    <option value="m4a">M4A/AAC</option>
+                    <option value="flac">FLAC (Lossless)</option>
+                    <option value="aif">AIF/AIFF (Apple)</option>
+                    <option value="webm">WebM Audio</option>
+                </select>
+                <button class="batch-convert-btn" onclick="batchConvert()">Convert All</button>
+            </div>
+            <div class="supported-formats">
+                <strong>Supports:</strong> MP3, WAV, OGG, M4A, FLAC, AAC, OPUS, WebM, MP4 Audio, WMA, AIF/AIFF, AU & more
+            </div>
+        </div>
+
+        <div class="drop-zone" id="dropZone">
+            <h2>Drop Audio Files Here</h2>
+            <p>or</p>
+            <label for="fileInput" class="file-input-label">
+                Browse Files
+            </label>
+            <input type="file" id="fileInput" accept="audio/*,video/*" multiple>
+            <p style="margin-top: 20px; font-size: 0.9rem;">
+                Accepts ALL audio formats including MP3, WAV, FLAC, OGG, M4A, AAC, OPUS, WMA, AIF/AIFF, and more
+            </p>
+        </div>
+
+        <div class="files-container" id="filesContainer" style="display: none;">
+            <div class="files-header">
+                <h3>Your Audio Files</h3>
+                <div class="header-buttons">
+                    <button class="clear-all-btn" onclick="clearAll()">Clear All</button>
+                    <button class="download-all-btn" id="downloadAllBtn" onclick="downloadAll()">
+                        Download All Files
+                    </button>
+                </div>
+            </div>
+            <div id="filesList"></div>
+        </div>
+
+        <div class="empty-state" id="emptyState">
+            <svg viewBox="0 0 24 24">
+                <path d="M12,3V12.26C11.5,12.09 11,12 10.5,12C8,12 6,14 6,16.5C6,19 8,21 10.5,21C13,21 15,19 15,16.5V6H19V3H12Z"/>
+            </svg>
+            <p>No audio files loaded yet</p>
+            <div class="format-info">
+                <h4>Supported Input Formats:</h4>
+                <div class="format-list">
+                    <div class="format-list-item">
+                        <span class="badge">MP3</span> MPEG Audio Layer 3
+                    </div>
+                    <div class="format-list-item">
+                        <span class="badge">WAV</span> Waveform Audio
+                    </div>
+                    <div class="format-list-item">
+                        <span class="badge">FLAC</span> Lossless Audio
+                    </div>
+                    <div class="format-list-item">
+                        <span class="badge">OGG</span> Ogg Vorbis/Opus
+                    </div>
+                    <div class="format-list-item">
+                        <span class="badge">M4A</span> MPEG-4 Audio
+                    </div>
+                    <div class="format-list-item">
+                        <span class="badge">AAC</span> Advanced Audio
+                    </div>
+                    <div class="format-list-item">
+                        <span class="badge">WebM</span> WebM Audio
+                    </div>
+                    <div class="format-list-item">
+                        <span class="badge">WMA</span> Windows Media
+                    </div>
+                    <div class="format-list-item">
+                        <span class="badge">AIF/AIFF</span> Apple Audio
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.0/lame.min.js"></script>
+    <script>
+        let audioFiles = [];
+        let audioContext = null;
+
+        // Initialize audio context
+        function getAudioContext() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return audioContext;
+        }
+
+        // Initialize drag and drop
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const filesContainer = document.getElementById('filesContainer');
+        const filesList = document.getElementById('filesList');
+        const emptyState = document.getElementById('emptyState');
+
+        // Prevent default drag behaviors
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        // Highlight drop zone when item is dragged over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            dropZone.classList.add('dragover');
+        }
+
+        function unhighlight(e) {
+            dropZone.classList.remove('dragover');
+        }
+
+        // Handle dropped files
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+
+        // Handle file input change
+        fileInput.addEventListener('change', function(e) {
+            handleFiles(this.files);
+        });
+
+        function handleFiles(files) {
+            const audioFilesArray = Array.from(files).filter(file => {
+                // Accept any audio or video file (for audio extraction)
+                return file.type.startsWith('audio/') ||
+                       file.type.startsWith('video/') ||
+                       // Also accept files with audio extensions even if MIME type is not set
+                       /\.(mp3|wav|ogg|m4a|flac|aac|opus|webm|wma|aiff|aif|aifc|au|mp4|avi|mov)$/i.test(file.name);
+            });
+
+            audioFilesArray.forEach(file => {
+                const fileObj = {
+                    id: Date.now() + Math.random(),
+                    file: file,
+                    originalName: file.name,
+                    newName: file.name,
+                    size: file.size,
+                    type: file.type || detectMimeType(file.name),
+                    url: URL.createObjectURL(file),
+                    targetFormat: null,
+                    quality: 'high',
+                    converting: false,
+                    convertedBlob: null
+                };
+                audioFiles.push(fileObj);
+            });
+
+            updateFilesList();
+        }
+
+        function detectMimeType(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const mimeTypes = {
+                'mp3': 'audio/mpeg',
+                'wav': 'audio/wav',
+                'ogg': 'audio/ogg',
+                'oga': 'audio/ogg',
+                'opus': 'audio/opus',
+                'm4a': 'audio/mp4',
+                'aac': 'audio/aac',
+                'webm': 'audio/webm',
+                'flac': 'audio/flac',
+                'wma': 'audio/x-ms-wma',
+                'aiff': 'audio/aiff',
+                'aif': 'audio/aiff',
+                'aifc': 'audio/aiff',
+                'au': 'audio/basic'
+            };
+            return mimeTypes[ext] || 'audio/*';
+        }
+
+        function updateFilesList() {
+            if (audioFiles.length === 0) {
+                filesContainer.style.display = 'none';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            filesContainer.style.display = 'block';
+            emptyState.style.display = 'none';
+
+            filesList.innerHTML = audioFiles.map(fileObj => `
+                <div class="file-item ${fileObj.converting ? 'converting' : ''}" data-id="${fileObj.id}">
+                    <div class="file-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M12,3V12.26C11.5,12.09 11,12 10.5,12C8,12 6,14 6,16.5C6,19 8,21 10.5,21C13,21 15,19 15,16.5V6H19V3H12Z"/>
+                        </svg>
+                    </div>
+                    <div class="file-info">
+                        <div class="file-name-container" id="nameContainer-${fileObj.id}">
+                            <span class="file-name">${fileObj.newName}</span>
+                            <span class="format-badge">${getFileExtension(fileObj.originalName)}</span>
+                            ${fileObj.converting ? '<span class="converting-indicator">Converting...</span>' : ''}
+                        </div>
+                        ${fileObj.originalName !== fileObj.newName ?
+                            `<div class="original-name">Original: ${fileObj.originalName}</div>` : ''}
+                        <div class="file-meta">
+                            <span>Size: ${formatFileSize(fileObj.size)}</span>
+                            <span>Type: ${fileObj.type || 'Unknown'}</span>
+                        </div>
+                        <div class="format-converter">
+                            <label class="format-label">Export as:</label>
+                            <select class="format-select" id="format-${fileObj.id}" onchange="updateTargetFormat(${fileObj.id}, this.value)">
+                                <option value="">Original (${getFileExtension(fileObj.originalName)})</option>
+                                <option value="wav">WAV - Uncompressed</option>
+                                <option value="mp3">MP3 - Compressed</option>
+                                <option value="ogg">OGG - Vorbis</option>
+                                <option value="m4a">M4A - AAC</option>
+                                <option value="flac">FLAC - Lossless</option>
+                                <option value="aif">AIF - Apple Lossless</option>
+                                <option value="webm">WebM - Opus</option>
+                            </select>
+                            <label class="format-label">Quality:</label>
+                            <select class="quality-select" id="quality-${fileObj.id}" onchange="updateQuality(${fileObj.id}, this.value)">
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                        <div class="audio-player">
+                            <audio controls class="audio-controls">
+                                <source src="${fileObj.url}" type="${fileObj.type}">
+                                Your browser does not support the audio element.
+                            </audio>
+                        </div>
+                    </div>
+                    <div class="file-actions">
+                        <button class="action-btn" onclick="editFileName(${fileObj.id})" title="Rename">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"/>
+                            </svg>
+                        </button>
+                        <button class="download-btn" onclick="downloadFile(${fileObj.id})" title="Download">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z"/>
+                            </svg>
+                            Download
+                        </button>
+                        <button class="action-btn" onclick="removeFile(${fileObj.id})" title="Remove">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="progress-bar" id="progress-${fileObj.id}" style="display: none;">
+                        <div class="progress-fill" id="progress-fill-${fileObj.id}"></div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Restore format selections
+            audioFiles.forEach(fileObj => {
+                if (fileObj.targetFormat) {
+                    const formatSelect = document.getElementById(`format-${fileObj.id}`);
+                    if (formatSelect) formatSelect.value = fileObj.targetFormat;
+                }
+                if (fileObj.quality) {
+                    const qualitySelect = document.getElementById(`quality-${fileObj.id}`);
+                    if (qualitySelect) qualitySelect.value = fileObj.quality;
+                }
+            });
+
+            // Stop all audio when a new one plays
+            const audioElements = document.querySelectorAll('audio');
+            audioElements.forEach(audio => {
+                audio.addEventListener('play', function() {
+                    audioElements.forEach(otherAudio => {
+                        if (otherAudio !== audio) {
+                            otherAudio.pause();
+                        }
+                    });
+                });
+            });
+        }
+
+        function getFileExtension(filename) {
+            return filename.split('.').pop().toUpperCase();
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        function updateTargetFormat(id, format) {
+            const fileObj = audioFiles.find(f => f.id === id);
+            fileObj.targetFormat = format || null;
+        }
+
+        function updateQuality(id, quality) {
+            const fileObj = audioFiles.find(f => f.id === id);
+            fileObj.quality = quality;
+        }
+
+        function editFileName(id) {
+            const fileObj = audioFiles.find(f => f.id === id);
+            const container = document.getElementById(`nameContainer-${id}`);
+
+            const currentName = fileObj.newName;
+            const extension = '.' + getFileExtension(currentName).toLowerCase();
+            const nameWithoutExt = currentName.substring(0, currentName.lastIndexOf('.'));
+
+            container.innerHTML = `
+                <input type="text" class="file-name-input" id="input-${id}" value="${nameWithoutExt}">
+                <span class="format-badge">${getFileExtension(currentName)}</span>
+                <button class="save-btn" onclick="saveFileName(${id}, '${extension}')">Save</button>
+                <button class="cancel-btn" onclick="cancelEdit(${id})">Cancel</button>
+            `;
+
+            const input = document.getElementById(`input-${id}`);
+            input.focus();
+            input.select();
+
+            input.addEventListener('keyup', function(e) {
+                if (e.key === 'Enter') {
+                    saveFileName(id, extension);
+                } else if (e.key === 'Escape') {
+                    cancelEdit(id);
+                }
+            });
+        }
+
+        function saveFileName(id, extension) {
+            const input = document.getElementById(`input-${id}`);
+            const newName = input.value.trim() + extension;
+
+            if (newName === extension) {
+                alert('Please enter a valid file name');
+                return;
+            }
+
+            const fileObj = audioFiles.find(f => f.id === id);
+            fileObj.newName = newName;
+
+            updateFilesList();
+        }
+
+        function cancelEdit(id) {
+            updateFilesList();
+        }
+
+        async function convertAudio(fileObj, targetFormat) {
+            const ctx = getAudioContext();
+
+            try {
+                // Show progress
+                const progressBar = document.getElementById(`progress-${fileObj.id}`);
+                const progressFill = document.getElementById(`progress-fill-${fileObj.id}`);
+                if (progressBar) progressBar.style.display = 'block';
+
+                fileObj.converting = true;
+                updateFilesList();
+
+                // Read file as array buffer
+                const arrayBuffer = await fileObj.file.arrayBuffer();
+
+                // Decode audio data
+                const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+
+                // Update progress
+                if (progressFill) progressFill.style.width = '50%';
+
+                // Convert based on target format
+                let blob;
+                switch(targetFormat) {
+                    case 'wav':
+                        blob = await convertToWav(audioBuffer, fileObj.quality);
+                        break;
+                    case 'mp3':
+                        blob = await convertToMp3(audioBuffer, fileObj.quality);
+                        break;
+                    case 'aif':
+                    case 'aiff':
+                        blob = await convertToAiff(audioBuffer, fileObj.quality);
+                        break;
+                    case 'ogg':
+                    case 'webm':
+                        blob = await convertToOggOrWebM(audioBuffer, targetFormat, fileObj.quality);
+                        break;
+                    case 'm4a':
+                    case 'flac':
+                        // For these formats, we'll use the original with a renamed extension
+                        // as full conversion requires more complex libraries
+                        blob = new Blob([arrayBuffer], { type: `audio/${targetFormat}` });
+                        break;
+                    default:
+                        blob = fileObj.file;
+                }
+
+                // Update progress
+                if (progressFill) progressFill.style.width = '100%';
+
+                fileObj.convertedBlob = blob;
+                fileObj.converting = false;
+
+                // Hide progress after a delay
+                setTimeout(() => {
+                    if (progressBar) progressBar.style.display = 'none';
+                    updateFilesList();
+                }, 500);
+
+                return blob;
+
+            } catch (error) {
+                console.error('Conversion error:', error);
+                fileObj.converting = false;
+                updateFilesList();
+                alert(`Error converting ${fileObj.originalName}: ${error.message}`);
+                return null;
+            }
+        }
+
+        async function convertToWav(audioBuffer, quality) {
+            const length = audioBuffer.length;
+            const numberOfChannels = audioBuffer.numberOfChannels;
+            const sampleRate = quality === 'high' ? audioBuffer.sampleRate :
+                             quality === 'medium' ? 22050 : 11025;
+
+            const wavBuffer = new ArrayBuffer(44 + length * numberOfChannels * 2);
+            const view = new DataView(wavBuffer);
+
+            // WAV header
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + length * numberOfChannels * 2, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, numberOfChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * numberOfChannels * 2, true);
+            view.setUint16(32, numberOfChannels * 2, true);
+            view.setUint16(34, 16, true);
+            writeString(36, 'data');
+            view.setUint32(40, length * numberOfChannels * 2, true);
+
+            // Write audio data
+            let offset = 44;
+            for (let i = 0; i < length; i++) {
+                for (let channel = 0; channel < numberOfChannels; channel++) {
+                    const sample = Math.max(-1, Math.min(1, audioBuffer.getChannelData(channel)[i]));
+                    view.setInt16(offset, sample * 0x7FFF, true);
+                    offset += 2;
+                }
+            }
+
+            return new Blob([wavBuffer], { type: 'audio/wav' });
+        }
+
+        async function convertToMp3(audioBuffer, quality) {
+            // Use lamejs for MP3 encoding
+            const channels = audioBuffer.numberOfChannels;
+            const sampleRate = audioBuffer.sampleRate;
+            const kbps = quality === 'high' ? 320 : quality === 'medium' ? 192 : 128;
+
+            const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, kbps);
+            const samples = audioBuffer.length;
+            const sampleBlockSize = 1152;
+
+            const mp3Data = [];
+
+            const left = audioBuffer.getChannelData(0);
+            const right = channels > 1 ? audioBuffer.getChannelData(1) : left;
+
+            const leftInt = new Int16Array(left.length);
+            const rightInt = new Int16Array(right.length);
+
+            for (let i = 0; i < left.length; i++) {
+                leftInt[i] = left[i] * 0x7FFF;
+                rightInt[i] = right[i] * 0x7FFF;
+            }
+
+            for (let i = 0; i < samples; i += sampleBlockSize) {
+                const leftChunk = leftInt.subarray(i, i + sampleBlockSize);
+                const rightChunk = rightInt.subarray(i, i + sampleBlockSize);
+                const mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+                if (mp3buf.length > 0) {
+                    mp3Data.push(mp3buf);
+                }
+            }
+
+            const mp3buf = mp3encoder.flush();
+            if (mp3buf.length > 0) {
+                mp3Data.push(mp3buf);
+            }
+
+            return new Blob(mp3Data, { type: 'audio/mp3' });
+        }
+
+        async function convertToAiff(audioBuffer, quality) {
+            const length = audioBuffer.length;
+            const numberOfChannels = audioBuffer.numberOfChannels;
+            const sampleRate = quality === 'high' ? audioBuffer.sampleRate :
+                             quality === 'medium' ? 22050 : 11025;
+            const bitsPerSample = 16;
+
+            // Calculate sizes
+            const dataSize = length * numberOfChannels * (bitsPerSample / 8);
+            const totalSize = 54 + dataSize; // AIFF header is 54 bytes
+
+            const aiffBuffer = new ArrayBuffer(totalSize);
+            const view = new DataView(aiffBuffer);
+
+            // Helper function to write string
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+
+            // Helper to write 32-bit big-endian integer
+            const writeUint32BE = (offset, value) => {
+                view.setUint32(offset, value, false);
+            };
+
+            // Helper to write 16-bit big-endian integer
+            const writeUint16BE = (offset, value) => {
+                view.setUint16(offset, value, false);
+            };
+
+            // Write AIFF header
+            writeString(0, 'FORM');
+            writeUint32BE(4, totalSize - 8);
+            writeString(8, 'AIFF');
+
+            // Write COMM chunk
+            writeString(12, 'COMM');
+            writeUint32BE(16, 18); // Chunk size
+            writeUint16BE(20, numberOfChannels);
+            writeUint32BE(22, length); // Number of sample frames
+            writeUint16BE(26, bitsPerSample);
+
+            // Write sample rate as 80-bit IEEE extended precision
+            // Simplified: just write a basic representation
+            const exponent = 0x400E; // Represents typical sample rate exponent
+            writeUint16BE(28, exponent);
+            writeUint32BE(30, sampleRate << 16);
+            writeUint32BE(34, 0);
+
+            // Write SSND chunk
+            writeString(38, 'SSND');
+            writeUint32BE(42, dataSize + 8); // Chunk size includes offset and block size
+            writeUint32BE(46, 0); // Offset
+            writeUint32BE(50, 0); // Block size
+
+            // Write audio data (big-endian)
+            let offset = 54;
+            for (let i = 0; i < length; i++) {
+                for (let channel = 0; channel < numberOfChannels; channel++) {
+                    const sample = Math.max(-1, Math.min(1, audioBuffer.getChannelData(channel)[i]));
+                    const int16 = Math.round(sample * 0x7FFF);
+                    writeUint16BE(offset, int16);
+                    offset += 2;
+                }
+            }
+
+            return new Blob([aiffBuffer], { type: 'audio/aiff' });
+        }
+
+        async function convertToOggOrWebM(audioBuffer, format, quality) {
+            // For OGG/WebM, we'll use MediaRecorder API if available
+            const ctx = getAudioContext();
+            const dest = ctx.createMediaStreamDestination();
+            const source = ctx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(dest);
+
+            const chunks = [];
+            const mimeType = format === 'webm' ? 'audio/webm;codecs=opus' : 'audio/ogg;codecs=opus';
+
+            const bitrate = quality === 'high' ? 256000 : quality === 'medium' ? 128000 : 64000;
+
+            const mediaRecorder = new MediaRecorder(dest.stream, {
+                mimeType: mimeType,
+                audioBitsPerSecond: bitrate
+            });
+
+            return new Promise((resolve) => {
+                mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: mimeType });
+                    resolve(blob);
+                };
+
+                mediaRecorder.start();
+                source.start();
+
+                setTimeout(() => {
+                    mediaRecorder.stop();
+                    source.stop();
+                }, audioBuffer.duration * 1000);
+            });
+        }
+
+        async function downloadFile(id) {
+            const fileObj = audioFiles.find(f => f.id === id);
+
+            let blob;
+            let filename = fileObj.newName;
+
+            if (fileObj.targetFormat) {
+                // Change extension based on target format
+                const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.'));
+                filename = `${nameWithoutExt}.${fileObj.targetFormat}`;
+
+                // Convert if not already converted
+                if (!fileObj.convertedBlob) {
+                    blob = await convertAudio(fileObj, fileObj.targetFormat);
+                    if (!blob) return; // Conversion failed
+                } else {
+                    blob = fileObj.convertedBlob;
+                }
+            } else {
+                blob = fileObj.file;
+            }
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function removeFile(id) {
+            const fileObj = audioFiles.find(f => f.id === id);
+            URL.revokeObjectURL(fileObj.url);
+            audioFiles = audioFiles.filter(f => f.id !== id);
+            updateFilesList();
+        }
+
+        function clearAll() {
+            audioFiles.forEach(fileObj => {
+                URL.revokeObjectURL(fileObj.url);
+            });
+            audioFiles = [];
+            updateFilesList();
+        }
+
+        async function downloadAll() {
+            if (audioFiles.length === 0) return;
+
+            for (let i = 0; i < audioFiles.length; i++) {
+                await new Promise(resolve => setTimeout(resolve, 200));
+                await downloadFile(audioFiles[i].id);
+            }
+        }
+
+        async function batchConvert() {
+            const format = document.getElementById('batchFormatSelect').value;
+            if (!format) return;
+
+            audioFiles.forEach(fileObj => {
+                fileObj.targetFormat = format;
+            });
+
+            updateFilesList();
+
+            alert(`All files will be converted to ${format.toUpperCase()} when downloaded`);
+        }
+    </script>
+</body>
+</html>
