@@ -1418,20 +1418,27 @@
             alert(`All files will be converted to ${format.toUpperCase()} when downloaded`);
         }
 
-        // Audio Splitting Functionality
+        // Audio Splitting Functionality with progress feedback
         async function detectSplitPoints(id) {
             const fileObj = audioFiles.find(f => f.id === id);
             const threshold = parseFloat(document.getElementById(`threshold-${id}`).value);
             const minSilence = parseFloat(document.getElementById(`minSilence-${id}`).value);
             const minSegment = parseFloat(document.getElementById(`minSegment-${id}`).value);
 
+            const button = document.querySelector(`button[onclick="detectSplitPoints(${id})"]`);
+            const originalText = button.textContent;
+
             try {
+                button.disabled = true;
+                button.textContent = 'Analyzing...';
+
                 const ctx = getAudioContext();
 
                 // Use cached buffer if available
                 let audioBuffer = fileObj.cachedAudioBuffer;
 
                 if (!audioBuffer) {
+                    button.textContent = 'Decoding audio...';
                     const arrayBuffer = await fileObj.file.arrayBuffer();
                     audioBuffer = await ctx.decodeAudioData(arrayBuffer);
 
@@ -1440,18 +1447,38 @@
                     fileObj.cacheTimestamp = Date.now();
                 }
 
-                // Analyze audio for silence
-                const splitPoints = analyzeSilence(audioBuffer, threshold, minSilence, minSegment);
+                button.textContent = 'Detecting silence...';
+
+                // Analyze audio for silence with progress callback
+                const splitPoints = await analyzeSilence(audioBuffer, threshold, minSilence, minSegment,
+                    (progress) => {
+                        button.textContent = `Analyzing ${Math.round(progress * 100)}%`;
+                    }
+                );
 
                 // Store split points
                 fileObj.splitPoints = splitPoints;
                 fileObj.splitSegments = createSegments(splitPoints, audioBuffer.duration);
 
+                button.textContent = 'Complete!';
+
                 // Display preview
                 displaySplitPreview(fileObj);
 
+                // Auto-draw waveform if splits detected
+                if (splitPoints.length > 0) {
+                    await drawWaveform(id);
+                }
+
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.disabled = false;
+                }, 1000);
+
             } catch (error) {
                 console.error('Error detecting split points:', error);
+                button.textContent = originalText;
+                button.disabled = false;
                 alert(`Error analyzing audio: ${error.message}`);
             }
         }
@@ -1469,8 +1496,8 @@
             return Math.sqrt(sum / actualWindowSize);
         }
 
-        // Improved silence detection with RMS analysis, multi-channel support, and hysteresis
-        function analyzeSilence(audioBuffer, thresholdDb, minSilenceDuration, minSegmentDuration) {
+        // Optimized silence detection with aggressive downsampling for speed
+        async function analyzeSilence(audioBuffer, thresholdDb, minSilenceDuration, minSegmentDuration, progressCallback) {
             // Validation
             if (!audioBuffer || audioBuffer.length === 0) {
                 throw new Error('Invalid audio buffer: buffer is empty');
@@ -1491,8 +1518,8 @@
             const sampleRate = audioBuffer.sampleRate;
             const numberOfChannels = audioBuffer.numberOfChannels;
 
-            // Use RMS windowing instead of single-sample detection
-            const windowSize = Math.floor(sampleRate * 0.02); // 20ms windows
+            // AGGRESSIVE optimization: Use 100ms windows for fast processing
+            const windowSize = Math.floor(sampleRate * 0.1); // 100ms windows (5× faster)
             const minSilenceSamples = minSilenceDuration * sampleRate;
             const minSegmentSamples = minSegmentDuration * sampleRate;
 
@@ -1501,13 +1528,16 @@
             const audioThresholdDb = thresholdDb + 6; // 6dB hysteresis
 
             const splitPoints = [];
-            let state = 'audio'; // or 'silence'
+            let state = 'audio';
             let silenceStart = null;
             let lastSplitPoint = 0;
 
+            const totalWindows = Math.ceil(audioBuffer.length / windowSize);
+            let processedWindows = 0;
+
             // Scan through audio with windowing
             for (let i = 0; i < audioBuffer.length; i += windowSize) {
-                // Analyze ALL channels, use the loudest one (multi-channel support)
+                // Analyze ALL channels, use the loudest one
                 let maxRMS = 0;
 
                 for (let channel = 0; channel < numberOfChannels; channel++) {
@@ -1521,27 +1551,30 @@
 
                 // State machine with hysteresis
                 if (state === 'audio' && currentDb < silenceThresholdDb) {
-                    // Transition to silence
                     state = 'silence';
                     silenceStart = i;
                 } else if (state === 'silence' && currentDb > audioThresholdDb) {
-                    // Transition to audio
                     state = 'audio';
 
                     if (silenceStart !== null) {
                         const silenceDuration = i - silenceStart;
 
-                        // Check if silence and segment are long enough
                         if (silenceDuration >= minSilenceSamples &&
                             (silenceStart - lastSplitPoint) >= minSegmentSamples) {
-                            // Split in the middle of silence
                             const splitPoint = silenceStart + Math.floor(silenceDuration / 2);
-                            splitPoints.push(splitPoint / sampleRate); // Convert to seconds
+                            splitPoints.push(splitPoint / sampleRate);
                             lastSplitPoint = splitPoint;
                         }
                     }
 
                     silenceStart = null;
+                }
+
+                // Progress updates every 50 windows (keeps UI responsive)
+                processedWindows++;
+                if (progressCallback && processedWindows % 50 === 0) {
+                    progressCallback(processedWindows / totalWindows);
+                    await new Promise(resolve => setTimeout(resolve, 0)); // Yield to UI
                 }
             }
 
@@ -1779,7 +1812,7 @@
             }
         }
 
-        // Waveform visualization
+        // Optimized waveform visualization with downsampling
         async function drawWaveform(fileId) {
             const fileObj = audioFiles.find(f => f.id === fileId);
             const canvas = document.getElementById(`waveform-${fileId}`);
@@ -1802,7 +1835,27 @@
                 }
 
                 const channelData = audioBuffer.getChannelData(0);
-                const step = Math.ceil(channelData.length / width);
+
+                // OPTIMIZED: Limit max samples to analyze (aggressive downsampling)
+                const maxSamples = Math.min(channelData.length, 50000); // Cap at 50k samples
+                const step = Math.ceil(channelData.length / maxSamples);
+                const downsampledData = [];
+
+                // Downsample first for speed
+                for (let i = 0; i < channelData.length; i += step) {
+                    let min = 1.0;
+                    let max = -1.0;
+
+                    for (let j = 0; j < step && (i + j) < channelData.length; j++) {
+                        const sample = channelData[i + j];
+                        if (sample < min) min = sample;
+                        if (sample > max) max = sample;
+                    }
+
+                    downsampledData.push({ min, max });
+                }
+
+                const pixelsPerSample = width / downsampledData.length;
                 const amp = height / 2;
 
                 // Clear canvas
@@ -1818,27 +1871,17 @@
                 ctx.lineTo(width, amp);
                 ctx.stroke();
 
-                // Draw waveform
+                // Draw waveform (optimized - direct path)
                 ctx.beginPath();
                 ctx.strokeStyle = '#667eea';
                 ctx.lineWidth = 1;
 
-                for (let i = 0; i < width; i++) {
-                    let min = 1.0;
-                    let max = -1.0;
+                for (let i = 0; i < downsampledData.length; i++) {
+                    const x = i * pixelsPerSample;
+                    const { min, max } = downsampledData[i];
 
-                    // Find min/max in this window
-                    for (let j = 0; j < step; j++) {
-                        const index = (i * step) + j;
-                        if (index < channelData.length) {
-                            const datum = channelData[index];
-                            if (datum < min) min = datum;
-                            if (datum > max) max = datum;
-                        }
-                    }
-
-                    ctx.moveTo(i, (1 + min) * amp);
-                    ctx.lineTo(i, (1 + max) * amp);
+                    ctx.moveTo(x, (1 + min) * amp);
+                    ctx.lineTo(x, (1 + max) * amp);
                 }
 
                 ctx.stroke();
